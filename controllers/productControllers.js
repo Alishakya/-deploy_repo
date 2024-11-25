@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs"; // Import fs module
 
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -105,4 +106,65 @@ export const getProductDetail = async (req, res) => {
   if (!product) throw new Error("something went wrong");
 
   res.status(200).json(product);
+};
+
+export const getProductList = async (req,res) => {
+  const {
+    page=1,
+    limit=10,
+    sortBy="createdAt",
+    order="desc",
+    search="",
+  } = req.query;
+
+try{
+  const products =await Product.aggregate([
+    
+
+    
+      
+    {$match:{
+      title: { $regex: new RegExp(search, "i")},
+      // quantity: { $gt:10},
+      quantity: { $lt:30},// ne(not eqauls to), lt(less than), gt(greater than), gte(greater than or equal), lte(less than or equal),eq( eqauls to)
+      // $or:
+      $and: [
+        {price: {$gte:1000 , $lte:1500}},
+        {quantity: { $lte:30}},
+      ],
+    },
+  },
+  
+   { $lookup: {
+      from: "categories",
+      localField: "category",
+      foreignField:"_id",
+      as: "category",
+    },
+   },
+
+ {$set: {category: { $first: "$category"}},},
+
+   { $group:{
+      _id: "$category._id",
+      categoryName: {$first:"$category.name"},
+      totalquantity: {$sum:"$quantity"},
+      totalPrice: {$sum:"$price"},
+      products: {$push:"$$ROOT"},
+      averagePrice: {$avg:"$price"},
+    },
+  },
+
+  
+  //    { $set: {category: { $first: "$category"}}},
+  { $skip: (page-1)* Number(limit)},
+  {$limit: Number(limit)},
+  {$sort:{createdAt: order === "asc" ?1 :-1}},
+ 
+  ]);
+
+  res.status(200).json(products);
+}catch (error) {
+  res.status(500).json({ message:error.message});
+}
 };
